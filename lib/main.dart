@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart'; // Вместо dart:io
 import 'welcome_screen.dart';
 import 'dnevnik.dart';
 import 'calendar.dart';
@@ -13,8 +13,8 @@ import 'export_screen.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Настройки для разных платформ
-  if (Platform.isIOS) {
+  // Настройки только для мобильных платформ
+  if (!kIsWeb) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarBrightness: Brightness.dark,
       statusBarIconBrightness: Brightness.light,
@@ -29,7 +29,6 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Дневник Берика',
-      // Добавляем делегаты локализации для корректной работы с русским языком
       localizationsDelegates: [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -39,7 +38,6 @@ class MyApp extends StatelessWidget {
         const Locale('ru', 'RU'),
         const Locale('en', 'US'),
       ],
-      // Русская локализация
       locale: Locale('ru', 'RU'),
       theme: ThemeData(
         primarySwatch: MaterialColor(0xFF6A1B9A, {
@@ -76,7 +74,6 @@ class MyApp extends StatelessWidget {
           selectionColor: Color(0xFF4CAF50).withOpacity(0.3),
           selectionHandleColor: Color(0xFF4CAF50),
         ),
-        // Глобальный стиль для всех TextField
         textTheme: TextTheme(
           displayLarge: TextStyle(color: Colors.white),
           displayMedium: TextStyle(color: Colors.white),
@@ -86,8 +83,8 @@ class MyApp extends StatelessWidget {
           titleLarge: TextStyle(color: Colors.white),
           titleMedium: TextStyle(color: Colors.white),
           titleSmall: TextStyle(color: Colors.white),
-          bodyLarge: TextStyle(color: Colors.black), // Для TextField
-          bodyMedium: TextStyle(color: Colors.black), // Для TextField
+          bodyLarge: TextStyle(color: Colors.black),
+          bodyMedium: TextStyle(color: Colors.black),
           labelLarge: TextStyle(color: Colors.white),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
@@ -131,6 +128,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// Остальной код MainScreen остается тот же...
 class MainScreen extends StatefulWidget {
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -273,9 +271,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     
     if (selectedDate != null) {
       setState(() {
-        _selectedIndex = 1; // Переключаемся на календарь
+        _selectedIndex = 1;
       });
-      // Здесь можно передать дату в календарь
     }
   }
 
@@ -344,7 +341,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   }
 
   void _performImport(String type) {
-    // Симуляция импорта
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -412,13 +408,13 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         content: TextField(
           controller: controller,
           maxLines: 3,
-          style: TextStyle(color: Colors.black), // Черный текст
+          style: TextStyle(color: Colors.black),
           decoration: InputDecoration(
             hintText: 'Быстрая заметка...',
             hintStyle: TextStyle(color: Colors.grey[600]),
             border: OutlineInputBorder(),
             filled: true,
-            fillColor: Colors.white, // Белый фон
+            fillColor: Colors.white,
           ),
         ),
         actions: [
