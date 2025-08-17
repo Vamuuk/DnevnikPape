@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Внутреннее хранилище приложения -->
+    <files-path name="internal_files" path="." />
+    
+    <!-- Кэш приложения -->
+    <cache-path name="cache" path="." />
+    
+    <!-- Внешнее хранилище приложения -->
+    <external-files-path name="external_files" path="." />
+    
+    <!-- Папка для голосовых заметок -->
+    <external-files-path name="voice_notes" path="voice_notes/" />
+    
+    <!-- Общее внешнее хранилище (если нужно) -->
+    <external-path name="external_storage" path="." />
+</paths>
