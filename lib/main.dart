@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter/foundation.dart'; // Вместо dart:io
+import 'package:flutter/foundation.dart';
 import 'welcome_screen.dart';
 import 'dnevnik.dart';
 import 'calendar.dart';
@@ -116,19 +116,17 @@ class MyApp extends StatelessWidget {
           primary: Color(0xFF6A1B9A),
           secondary: Color(0xFF4CAF50),
           surface: Color(0xFF424242),
-          background: Color(0xFF2E2E2E),
           onPrimary: Colors.white,
           onSecondary: Colors.white,
           onSurface: Colors.white,
-          onBackground: Colors.white,
         ),
       ),
-      home: WelcomeScreen(),
+      // Для веба сразу переходим к основному экрану
+      home: kIsWeb ? MainScreen() : WelcomeScreen(),
     );
   }
 }
 
-// Остальной код MainScreen остается тот же...
 class MainScreen extends StatefulWidget {
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -264,32 +262,40 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   }
 
   void _navigateToSearch() async {
-    DateTime? selectedDate = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => SearchScreen()),
-    );
-    
-    if (selectedDate != null) {
-      setState(() {
-        _selectedIndex = 1;
-      });
+    try {
+      DateTime? selectedDate = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SearchScreen()),
+      );
+      
+      if (selectedDate != null) {
+        setState(() {
+          _selectedIndex = 1;
+        });
+      }
+    } catch (e) {
+      print('Ошибка навигации к поиску: $e');
     }
   }
 
   void _handleMenuAction(String action) {
-    switch (action) {
-      case 'export':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => ExportScreen()),
-        );
-        break;
-      case 'backup':
-        _showBackupDialog();
-        break;
-      case 'import':
-        _showImportDialog();
-        break;
+    try {
+      switch (action) {
+        case 'export':
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ExportScreen()),
+          );
+          break;
+        case 'backup':
+          _showBackupDialog();
+          break;
+        case 'import':
+          _showImportDialog();
+          break;
+      }
+    } catch (e) {
+      print('Ошибка обработки действия меню: $e');
     }
   }
 
@@ -297,32 +303,33 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Color(0xFF424242),
         title: Row(
           children: [
             Icon(Icons.upload, color: Colors.blue),
             SizedBox(width: 8),
-            Text('Импорт данных'),
+            Text('Импорт данных', style: TextStyle(color: Colors.white)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Выберите файл для импорта:'),
+            Text('Выберите файл для импорта:', style: TextStyle(color: Colors.white)),
             SizedBox(height: 16),
             ListTile(
-              leading: Icon(Icons.file_present),
-              title: Text('JSON файл'),
-              subtitle: Text('Импорт из предыдущего экспорта'),
+              leading: Icon(Icons.file_present, color: Colors.white),
+              title: Text('JSON файл', style: TextStyle(color: Colors.white)),
+              subtitle: Text('Импорт из предыдущего экспорта', style: TextStyle(color: Colors.grey)),
               onTap: () {
                 Navigator.pop(context);
                 _performImport('json');
               },
             ),
             ListTile(
-              leading: Icon(Icons.backup),
-              title: Text('Резервная копия'),
-              subtitle: Text('Восстановление из бэкапа'),
+              leading: Icon(Icons.backup, color: Colors.white),
+              title: Text('Резервная копия', style: TextStyle(color: Colors.white)),
+              subtitle: Text('Восстановление из бэкапа', style: TextStyle(color: Colors.grey)),
               onTap: () {
                 Navigator.pop(context);
                 _performImport('backup');
@@ -333,7 +340,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Отмена'),
+            child: Text('Отмена', style: TextStyle(color: Color(0xFF4CAF50))),
           ),
         ],
       ),
@@ -345,11 +352,12 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
+        backgroundColor: Color(0xFF424242),
         content: Row(
           children: [
-            CircularProgressIndicator(),
+            CircularProgressIndicator(color: Color(0xFF4CAF50)),
             SizedBox(width: 16),
-            Text('Импортируем данные...'),
+            Text('Импортируем данные...', style: TextStyle(color: Colors.white)),
           ],
         ),
       ),
@@ -377,20 +385,25 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Резервная копия'),
-        content: Text('Создать резервную копию всех записей?'),
+        backgroundColor: Color(0xFF424242),
+        title: Text('Резервная копия', style: TextStyle(color: Colors.white)),
+        content: Text('Создать резервную копию всех записей?', style: TextStyle(color: Colors.white)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Отмена'),
+            child: Text('Отмена', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Резервная копия создана!')),
+                SnackBar(
+                  content: Text('Резервная копия создана!'),
+                  backgroundColor: Color(0xFF4CAF50),
+                ),
               );
             },
+            style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF4CAF50)),
             child: Text('Создать'),
           ),
         ],
@@ -426,7 +439,10 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Заметка добавлена!')),
+                SnackBar(
+                  content: Text('Заметка добавлена!'),
+                  backgroundColor: Color(0xFF4CAF50),
+                ),
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF4CAF50)),
