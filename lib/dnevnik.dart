@@ -4,15 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:async';
 
-// Условные импорты - только для мобильных платформ
-import 'package:flutter_sound/flutter_sound.dart' if (dart.library.html) 'dart:html';
-import 'package:permission_handler/permission_handler.dart' if (dart.library.html) 'dart:html';
-import 'package:path_provider/path_provider.dart' if (dart.library.html) 'dart:html';
-import 'dart:io' if (dart.library.html) 'dart:html';
-
 class VoiceNote {
   final String id;
-  final String path; // Для мобильных - путь к файлу, для web - текст заметки
+  final String path; // Для веба - текст заметки
   final DateTime date;
   final int durationMs;
 
@@ -44,7 +38,6 @@ class VoiceNote {
     return '${mins}:${secs.toString().padLeft(2, '0')}';
   }
   
-  // Для web - показываем как текстовую заметку
   String get displayText {
     if (kIsWeb) {
       return path; // В web версии path содержит текст
@@ -66,16 +59,9 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
   int _wordCount = 0;
   bool _isEditing = false;
   
-  // Голосовые заметки
+  // Голосовые заметки (для веба - текстовые)
   List<VoiceNote> _voiceNotes = [];
   bool _isRecording = false;
-  bool _isPlaying = false;
-  String _playingNoteId = '';
-  DateTime? _recordingStartTime;
-  
-  // Audio - только для мобильных
-  dynamic _recorder;
-  dynamic _player;
   
   // Анимация
   late AnimationController _pulseController;
@@ -91,9 +77,6 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
   void initState() {
     super.initState();
     _todayKey = DateTime.now().toString().split(' ')[0];
-    if (!kIsWeb) {
-      _initAudio();
-    }
     _loadNote();
     _controller.addListener(_updateWordCount);
     
@@ -107,36 +90,7 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
   void dispose() {
     _pulseController.dispose();
     _controller.dispose();
-    if (!kIsWeb) {
-      _closeAudio();
-    }
     super.dispose();
-  }
-
-  Future<void> _initAudio() async {
-    if (kIsWeb) return;
-    
-    try {
-      // Динамическое создание объектов аудио
-      _recorder = FlutterSoundRecorder();
-      _player = FlutterSoundPlayer();
-      
-      await _recorder!.openRecorder();
-      await _player!.openPlayer();
-    } catch (e) {
-      print('Ошибка инициализации аудио: $e');
-    }
-  }
-
-  Future<void> _closeAudio() async {
-    if (kIsWeb) return;
-    
-    try {
-      await _recorder?.closeRecorder();
-      await _player?.closePlayer();
-    } catch (e) {
-      print('Ошибка закрытия аудио: $e');
-    }
   }
 
   void _updateWordCount() {
@@ -155,7 +109,7 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
       _isEditing = false;
     });
     
-    // Загрузка голосовых заметок
+    // Загрузка заметок
     String voiceNotesJson = prefs.getString('${_todayKey}_voice') ?? '[]';
     try {
       List<dynamic> voiceList = jsonDecode(voiceNotesJson);
@@ -163,7 +117,7 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
         _voiceNotes = voiceList.map((item) => VoiceNote.fromJson(item)).toList();
       });
     } catch (e) {
-      print('Ошибка загрузки голосовых заметок: $e');
+      print('Ошибка загрузки заметок: $e');
     }
   }
 
@@ -173,7 +127,7 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
     await prefs.setString('${_todayKey}_mood', _mood);
     await prefs.setStringList('${_todayKey}_tags', _tags);
     
-    // Сохранение голосовых заметок
+    // Сохранение заметок
     String voiceNotesJson = jsonEncode(_voiceNotes.map((note) => note.toJson()).toList());
     await prefs.setString('${_todayKey}_voice', voiceNotesJson);
     
@@ -193,101 +147,6 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
         duration: Duration(seconds: 1),
       ),
     );
-  }
-
-  Future<void> _startRecording() async {
-    if (kIsWeb) {
-      // В web версии показываем диалог для текстовой заметки
-      _showTextNoteDialog();
-      return;
-    }
-    
-    // Мобильная версия - реальная запись
-    try {
-      var status = await Permission.microphone.request();
-      if (status != PermissionStatus.granted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Нужно разрешение на микрофон')),
-        );
-        return;
-      }
-
-      Directory appDir = await getApplicationDocumentsDirectory();
-      if (!await appDir.exists()) {
-        await appDir.create(recursive: true);
-      }
-
-      String fileName = '${DateTime.now().millisecondsSinceEpoch}';
-      String extension = Platform.isIOS ? '.m4a' : '.aac';
-      String filePath = '${appDir.path}/$fileName$extension';
-
-      await _recorder!.startRecorder(
-        toFile: filePath,
-        codec: Platform.isIOS ? Codec.aacMP4 : Codec.aacADTS,
-      );
-
-      setState(() {
-        _isRecording = true;
-        _recordingStartTime = DateTime.now();
-      });
-      _pulseController.repeat();
-
-    } catch (e) {
-      print('Ошибка начала записи: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка записи: $e')),
-      );
-    }
-  }
-
-  Future<void> _stopRecording() async {
-    if (kIsWeb) return;
-    
-    try {
-      String? path = await _recorder!.stopRecorder();
-      _pulseController.stop();
-
-      if (path != null && _recordingStartTime != null) {
-        int duration = DateTime.now().difference(_recordingStartTime!).inMilliseconds;
-        
-        if (duration < 1000) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Запись слишком короткая')),
-          );
-        } else {
-          VoiceNote newNote = VoiceNote(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            path: path,
-            date: DateTime.now(),
-            durationMs: duration,
-          );
-
-          setState(() {
-            _voiceNotes.add(newNote);
-            _isEditing = true;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Голосовая заметка записана (${newNote.formattedDuration})'),
-              backgroundColor: Color(0xFF4CAF50),
-            ),
-          );
-        }
-      }
-
-      setState(() {
-        _isRecording = false;
-        _recordingStartTime = null;
-      });
-
-    } catch (e) {
-      print('Ошибка остановки записи: $e');
-      setState(() {
-        _isRecording = false;
-        _recordingStartTime = null;
-      });
-    }
   }
 
   void _showTextNoteDialog() {
@@ -320,7 +179,7 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
               if (noteController.text.trim().isNotEmpty) {
                 VoiceNote newNote = VoiceNote(
                   id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  path: noteController.text.trim(), // В web версии path = текст
+                  path: noteController.text.trim(),
                   date: DateTime.now(),
                   durationMs: noteController.text.length * 100,
                 );
@@ -347,57 +206,12 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
     );
   }
 
-  Future<void> _playVoiceNote(VoiceNote note) async {
-    if (kIsWeb) {
-      // В web версии показываем текст
-      _viewVoiceNote(note);
-      return;
-    }
-    
-    // Мобильная версия - воспроизведение аудио
-    try {
-      if (_isPlaying && _playingNoteId == note.id) {
-        await _player!.stopPlayer();
-        setState(() {
-          _isPlaying = false;
-          _playingNoteId = '';
-        });
-        return;
-      }
-
-      if (_isPlaying) {
-        await _player!.stopPlayer();
-      }
-
-      await _player!.startPlayer(
-        fromURI: note.path,
-        whenFinished: () {
-          setState(() {
-            _isPlaying = false;
-            _playingNoteId = '';
-          });
-        },
-      );
-
-      setState(() {
-        _isPlaying = true;
-        _playingNoteId = note.id;
-      });
-
-    } catch (e) {
-      print('Ошибка воспроизведения: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка воспроизведения')),
-      );
-    }
-  }
-
   void _viewVoiceNote(VoiceNote note) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Color(0xFF424242),
-        title: Text(kIsWeb ? 'Быстрая заметка' : 'Голосовая заметка', style: TextStyle(color: Colors.white)),
+        title: Text('Быстрая заметка', style: TextStyle(color: Colors.white)),
         content: Container(
           width: double.maxFinite,
           child: Column(
@@ -409,10 +223,7 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
                 style: TextStyle(color: Colors.grey[400], fontSize: 12),
               ),
               SizedBox(height: 8),
-              if (kIsWeb) 
-                Text(note.path, style: TextStyle(color: Colors.white, fontSize: 14))
-              else
-                Text('Длительность: ${note.formattedDuration}', style: TextStyle(color: Colors.white, fontSize: 14)),
+              Text(note.path, style: TextStyle(color: Colors.white, fontSize: 14)),
             ],
           ),
         ),
@@ -421,14 +232,6 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
             onPressed: () => Navigator.pop(context),
             child: Text('Закрыть', style: TextStyle(color: Color(0xFF4CAF50))),
           ),
-          if (!kIsWeb)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _playVoiceNote(note);
-              },
-              child: Text('Воспроизвести', style: TextStyle(color: Color(0xFF4CAF50))),
-            ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
@@ -448,7 +251,7 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
         backgroundColor: Color(0xFF424242),
         title: Text('Удалить заметку?', style: TextStyle(color: Colors.white)),
         content: Text(
-          kIsWeb ? 'Быстрая заметка будет удалена навсегда' : 'Голосовая заметка будет удалена навсегда',
+          'Быстрая заметка будет удалена навсегда',
           style: TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -462,15 +265,6 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
                 _voiceNotes.removeWhere((n) => n.id == note.id);
                 _isEditing = true;
               });
-              
-              // Удаляем файл только в мобильной версии
-              if (!kIsWeb) {
-                try {
-                  File(note.path).deleteSync();
-                } catch (e) {
-                  print('Ошибка удаления файла: $e');
-                }
-              }
               
               Navigator.pop(context);
             },
@@ -617,10 +411,10 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
         children: [
           Row(
             children: [
-              Icon(kIsWeb ? Icons.note_add : Icons.mic, color: Color(0xFF4CAF50), size: 18),
+              Icon(Icons.note_add, color: Color(0xFF4CAF50), size: 18),
               SizedBox(width: 8),
               Text(
-                kIsWeb ? 'Быстрые заметки' : 'Голосовые заметки',
+                'Быстрые заметки',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -645,7 +439,6 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
                 itemCount: _voiceNotes.length,
                 itemBuilder: (context, index) {
                   final note = _voiceNotes[index];
-                  final isPlaying = _playingNoteId == note.id && _isPlaying;
                   
                   return Container(
                     width: 160,
@@ -654,17 +447,13 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
                     decoration: BoxDecoration(
                       color: Color(0xFF525252),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isPlaying ? Color(0xFF4CAF50) : Colors.transparent,
-                        width: 2,
-                      ),
                     ),
                     child: Column(
                       children: [
                         Row(
                           children: [
                             GestureDetector(
-                              onTap: () => _playVoiceNote(note),
+                              onTap: () => _viewVoiceNote(note),
                               child: Container(
                                 width: 28,
                                 height: 28,
@@ -673,7 +462,7 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
-                                  kIsWeb ? Icons.visibility : (isPlaying ? Icons.pause : Icons.play_arrow),
+                                  Icons.visibility,
                                   color: Colors.white,
                                   size: 16,
                                 ),
@@ -689,7 +478,7 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
                         ),
                         SizedBox(height: 8),
                         Text(
-                          kIsWeb ? '${note.path.length} симв.' : note.formattedDuration,
+                          '${note.path.length} симв.',
                           style: TextStyle(
                             color: Color(0xFF4CAF50),
                             fontWeight: FontWeight.bold,
@@ -712,50 +501,28 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
             SizedBox(height: 8),
           ],
           
-          // Кнопка записи/добавления заметки
+          // Кнопка добавления заметки
           GestureDetector(
-            onTap: _isRecording ? _stopRecording : _startRecording,
+            onTap: _showTextNoteDialog,
             child: Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _isRecording 
-                    ? Colors.red.withOpacity(0.2)
-                    : Color(0xFF4CAF50).withOpacity(0.2),
+                color: Color(0xFF4CAF50).withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _isRecording ? Colors.red : Color(0xFF4CAF50), 
+                  color: Color(0xFF4CAF50), 
                   width: 2,
                 ),
               ),
               child: Row(
                 children: [
-                  if (_isRecording && !kIsWeb) ...[
-                    AnimatedBuilder(
-                      animation: _pulseController,
-                      builder: (context, child) {
-                        return Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(_pulseController.value),
-                            shape: BoxShape.circle,
-                          ),
-                        );
-                      },
-                    ),
-                  ] else ...[
-                    Icon(kIsWeb ? Icons.add_comment : Icons.mic, color: Color(0xFF4CAF50), size: 18),
-                  ],
+                  Icon(Icons.add_comment, color: Color(0xFF4CAF50), size: 18),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      kIsWeb 
-                          ? 'Добавить быструю заметку'
-                          : (_isRecording 
-                              ? 'Запись... Нажмите для остановки'
-                              : 'Нажмите для записи'),
+                      'Добавить быструю заметку',
                       style: TextStyle(
-                        color: _isRecording ? Colors.red : Color(0xFF4CAF50),
+                        color: Color(0xFF4CAF50),
                         fontWeight: FontWeight.w500,
                         fontSize: 12,
                       ),
@@ -820,9 +587,7 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
           height: 1.5,
         ),
         decoration: InputDecoration(
-          hintText: kIsWeb 
-              ? 'Дополните текстом или оставьте только быстрые заметки...\n\n• Что интересного произошло?\n• Планы на завтра?'
-              : 'Дополните текстом или оставьте только голосовые заметки...\n\n• Что интересного произошло?\n• Планы на завтра?',
+          hintText: 'Дополните текстом или оставьте только быстрые заметки...\n\n• Что интересного произошло?\n• Планы на завтра?',
           hintStyle: TextStyle(color: Colors.grey[600], fontSize: 12),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -845,9 +610,9 @@ class _TodayScreenState extends State<TodayScreen> with TickerProviderStateMixin
             SizedBox(width: 4),
             Text('$_wordCount слов', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
             SizedBox(width: 12),
-            Icon(kIsWeb ? Icons.note : Icons.mic, size: 14, color: Colors.grey[400]),
+            Icon(Icons.note, size: 14, color: Colors.grey[400]),
             SizedBox(width: 4),
-            Text('${_voiceNotes.length} ${kIsWeb ? "заметок" : "голос."}', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
+            Text('${_voiceNotes.length} заметок', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
             Spacer(),
             if (_isEditing)
               Text('Изменения', 
